@@ -15,9 +15,9 @@ WP Debug Toolkit Pro adds CLI commands for debugging, profiling, and interacting
 WP="bash ${CLAUDE_SKILL_DIR}/scripts/wp"
 ```
 
-The wrapper auto-detects your environment (Local by Flywheel, standard WP-CLI, etc.) and handles PHP binary paths, MySQL sockets, and WP-CLI location automatically.
+The wrapper handles the common problem where `wp` isn't available in your terminal session. This happens because AI agents run in the user's regular terminal, which doesn't have access to the PHP binary and MySQL socket that tools like Local by Flywheel, MAMP, or Docker use internally. The wrapper detects the environment and constructs the correct invocation automatically.
 
-**Never run bare `wp` commands.** They will fail in most local development environments.
+**Never run bare `wp` commands.** They will fail unless you're inside a site shell or have WP-CLI configured system-wide.
 
 > **Note for non-Claude agents:** If `${CLAUDE_SKILL_DIR}` doesn't resolve in your environment, use the path to this skill's directory instead (e.g., `.claude/skills/wpdt-cli/scripts/wp` or `.cursor/skills/wpdt-cli/scripts/wp`).
 
@@ -144,7 +144,7 @@ Annotations persist across discovery runs.
 ## Requirements
 
 - **WP Debug Toolkit Pro** plugin must be installed and active on the WordPress site
-- The site must be running (if using Local by Flywheel, start it in the Local app first)
+- The site must be running (start it in Local by Flywheel, DDEV, Docker, etc. before running commands)
 - Query logging features require a Pro license (basic profiling works for all users)
 
 ## Troubleshooting
@@ -156,7 +156,7 @@ bash ${CLAUDE_SKILL_DIR}/scripts/wp --probe
 ```
 
 Common issues:
-- **"MySQL socket not found"** — The site isn't running. Start it in Local by Flywheel.
+- **"MySQL socket not found"** — The site isn't running. Start it in your local development tool.
 - **"Could not find WordPress root"** — Run from within a WordPress installation directory.
 - **"Command not found: dbtk"** — WP Debug Toolkit plugin isn't installed or activated.
 - **"Error establishing a database connection"** — Don't use bare `wp`. Use the wrapper script.

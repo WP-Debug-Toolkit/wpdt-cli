@@ -31,7 +31,7 @@ Supported agents: **Claude Code**, **Cursor**, **VS Code Copilot**, **Codex**, *
 - Enable or disable debug mode and query logging from the terminal
 - Call any endpoint with automatic authentication (no manual token setup)
 - Search and inspect endpoint details
-- Auto-detected WP-CLI environment — no manual configuration required for Local by Flywheel
+- Auto-detected WP-CLI environment — bridges the gap between your AI agent's terminal and local dev tools like Local by Flywheel, where `wp` works in the site shell but not from external terminals
 
 ---
 
@@ -97,7 +97,7 @@ PRs welcome — please test on your environment before submitting.
 ## Requirements
 
 - [WP Debug Toolkit Pro](https://wpdebugtoolkit.com) installed and active on the WordPress site
-- Site must be running (if using Local by Flywheel, start it in the Local app first)
+- Site must be running (start it in Local by Flywheel, DDEV, Docker, etc. before running commands)
 - Query logging features require a Pro license; basic profiling works for all users
 
 ---
