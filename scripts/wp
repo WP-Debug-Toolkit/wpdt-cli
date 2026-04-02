@@ -1,0 +1,186 @@
+#!/bin/sh
+# WP-CLI wrapper for local development environments.
+# Auto-detects Local by Flywheel; falls back to system wp.
+#
+# Usage:
+#   bash scripts/wp <any wp-cli command>
+#   bash scripts/wp dbtk api list --format=json
+#   bash scripts/wp --probe   (show detected environment as JSON)
+#
+# Supported environments:
+#   - Standard WP-CLI in PATH
+#   - Local by Flywheel (macOS, Apple Silicon + Intel)
+#
+# More environments coming soon:
+#   - MAMP, Docker, DDEV, Lando
+
+set -eu
+
+# =========================================================================
+# Probe flag — output detected environment as JSON
+# =========================================================================
+
+PROBE=0
+if [ "${1:-}" = "--probe" ]; then
+    PROBE=1
+    shift
+fi
+
+# =========================================================================
+# Detect WordPress root from current directory
+# =========================================================================
+
+find_wp_root() {
+    dir="$(pwd)"
+    while [ "$dir" != "/" ]; do
+        if [ -f "$dir/wp-load.php" ] && [ -f "$dir/wp-config.php" ]; then
+            echo "$dir"
+            return 0
+        fi
+        dir="$(dirname "$dir")"
+    done
+    return 1
+}
+
+WP_ROOT=""
+if WP_ROOT=$(find_wp_root); then
+    : # found
+else
+    echo "Error: Could not find WordPress root (wp-load.php) in any parent directory." >&2
+    echo "Run this script from within a WordPress installation." >&2
+    exit 1
+fi
+
+# =========================================================================
+# Strategy 1: Try system wp
+# =========================================================================
+
+if command -v wp >/dev/null 2>&1; then
+    if wp --path="$WP_ROOT" --info >/dev/null 2>&1; then
+        if [ "$PROBE" = "1" ]; then
+            cat <<PROBE_JSON
+{
+  "environment": "system-wp-cli",
+  "wp_cli": "$(command -v wp)",
+  "wordpress_root": "$WP_ROOT"
+}
+PROBE_JSON
+            exit 0
+        fi
+        exec wp --path="$WP_ROOT" "$@"
+    fi
+fi
+
+# =========================================================================
+# Strategy 2: Detect Local by Flywheel (macOS)
+# =========================================================================
+
+LOCAL_BASE="$HOME/Library/Application Support/Local"
+SITES_JSON="$LOCAL_BASE/sites.json"
+
+detect_local_by_flywheel() {
+    # Check if Local is installed
+    if [ ! -f "$SITES_JSON" ]; then
+        return 1
+    fi
+
+    # Detect architecture
+    ARCH="$(uname -m)"
+    if [ "$ARCH" = "arm64" ]; then
+        ARCH_DIR="darwin-arm64"
+    else
+        ARCH_DIR="darwin"
+    fi
+
+    # Find site in sites.json by matching WordPress root path
+    SITE_INFO=$(python3 -c "
+import json, os, sys
+sites_path = os.path.expanduser('$SITES_JSON')
+wp_root = '$WP_ROOT'
+with open(sites_path) as f:
+    sites = json.load(f)
+for s in sites.values():
+    site_path = s.get('path', '').replace('~', os.path.expanduser('~'))
+    site_public = os.path.join(site_path, 'app', 'public')
+    if os.path.realpath(site_public) == os.path.realpath(wp_root):
+        php_ver = s.get('services', {}).get('php', {}).get('version', '')
+        mysql_ver = s.get('services', {}).get('mysql', {}).get('version', '')
+        print(f\"{s['id']}|{site_path}|{php_ver}|{mysql_ver}|{s.get('name', '')}\")
+        sys.exit(0)
+sys.exit(1)
+" 2>/dev/null) || return 1
+
+    IFS='|' read -r SITE_ID SITE_PATH PHP_VER MYSQL_VER SITE_NAME <<EOF
+$SITE_INFO
+EOF
+
+    # Find PHP binary
+    PHP_BASE=$(find "$LOCAL_BASE/lightning-services" -maxdepth 1 -type d -name "php-${PHP_VER}*" 2>/dev/null | head -1)
+    if [ -z "$PHP_BASE" ]; then
+        echo "Error: Could not find PHP $PHP_VER in Local lightning-services." >&2
+        return 1
+    fi
+    PHP_BIN="$PHP_BASE/bin/$ARCH_DIR/bin/php"
+    if [ ! -x "$PHP_BIN" ]; then
+        echo "Error: PHP binary not found at $PHP_BIN" >&2
+        return 1
+    fi
+
+    # Find MySQL socket
+    MYSQL_SOCKET="$LOCAL_BASE/run/$SITE_ID/mysql/mysqld.sock"
+    if [ ! -S "$MYSQL_SOCKET" ]; then
+        echo "Error: MySQL socket not found at $MYSQL_SOCKET" >&2
+        echo "Is the '$SITE_NAME' site running in Local by Flywheel?" >&2
+        return 1
+    fi
+
+    # Find WP-CLI
+    WP_CLI_PHAR="/Applications/Local.app/Contents/Resources/extraResources/bin/wp-cli/wp-cli.phar"
+    if [ ! -f "$WP_CLI_PHAR" ]; then
+        echo "Error: WP-CLI not found at $WP_CLI_PHAR" >&2
+        echo "Is Local by Flywheel installed?" >&2
+        return 1
+    fi
+
+    # Export for use
+    export WPDT_PHP_BIN="$PHP_BIN"
+    export WPDT_MYSQL_SOCKET="$MYSQL_SOCKET"
+    export WPDT_WP_CLI="$WP_CLI_PHAR"
+    export WPDT_WP_ROOT="$WP_ROOT"
+    export WPDT_SITE_NAME="$SITE_NAME"
+    export WPDT_ENVIRONMENT="local-by-flywheel"
+
+    return 0
+}
+
+if detect_local_by_flywheel; then
+    if [ "$PROBE" = "1" ]; then
+        cat <<PROBE_JSON
+{
+  "environment": "local-by-flywheel",
+  "site_name": "$WPDT_SITE_NAME",
+  "php_binary": "$WPDT_PHP_BIN",
+  "mysql_socket": "$WPDT_MYSQL_SOCKET",
+  "wp_cli": "$WPDT_WP_CLI",
+  "wordpress_root": "$WPDT_WP_ROOT"
+}
+PROBE_JSON
+        exit 0
+    fi
+
+    exec "$WPDT_PHP_BIN" -d "mysqli.default_socket=$WPDT_MYSQL_SOCKET" "$WPDT_WP_CLI" --path="$WPDT_WP_ROOT" "$@"
+fi
+
+# =========================================================================
+# No environment detected
+# =========================================================================
+
+echo "Error: Could not find a working WP-CLI environment." >&2
+echo "" >&2
+echo "Tried:" >&2
+echo "  1. System wp-cli (not found or cannot connect)" >&2
+echo "  2. Local by Flywheel (not detected)" >&2
+echo "" >&2
+echo "Setup guide: https://wpdebugtoolkit.com/docs/cli-setup" >&2
+echo "Or install WP-CLI: https://wp-cli.org/#installing" >&2
+exit 1
