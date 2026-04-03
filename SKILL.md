@@ -100,6 +100,47 @@ $WP dbtk api call GET /wp/v2/posts --profile=queries   # Query data only
 $WP dbtk api call GET /wp/v2/posts --profile=summary   # Just timing + counts
 ```
 
+### Record and analyze a workflow
+
+Capture everything that happens during a sequence of actions:
+
+```bash
+# Start recording with a label
+$WP dbtk query-log start --duration=120 --tag=my-test
+
+# Do stuff — run CLI commands, browse the site, whatever
+$WP post list
+$WP wc product list
+
+# Stop recording
+$WP dbtk query-log stop
+
+# Analyze what happened
+$WP dbtk query-log read --tag=my-test --slow --duplicates
+$WP dbtk query-log read --tag=my-test --component=woocommerce --format=json
+$WP dbtk log read --level=error,warning --plugin=woocommerce --since=5m
+```
+
+### Read query logs with filters
+
+```bash
+$WP dbtk query-log read --tag=my-recording      # By recording session
+$WP dbtk query-log read --component=woocommerce  # By plugin
+$WP dbtk query-log read --type=SELECT --slow     # Slow SELECTs only
+$WP dbtk query-log read --duplicates             # N+1 patterns
+$WP dbtk query-log read --search="+wp_posts -wp_options"  # SQL text search
+$WP dbtk query-log read --since=5m --format=json # Last 5 minutes as JSON
+```
+
+### Read debug logs with filters
+
+```bash
+$WP dbtk log read --level=error,fatal            # Errors and fatals only
+$WP dbtk log read --plugin=woocommerce           # From a specific plugin
+$WP dbtk log read --source=theme --since=1h      # Theme errors in last hour
+$WP dbtk log read --search="+undefined -deprecated" --format=json
+```
+
 ### Manage query logging
 
 ```bash
@@ -131,7 +172,10 @@ Annotations persist across discovery runs.
 | `dbtk api edit <route>` | Annotate an endpoint (--description) |
 | `dbtk debug on/off/status` | Control WP_DEBUG, WP_DEBUG_LOG, WP_DEBUG_DISPLAY |
 | `dbtk log clear/stats` | Manage debug.log file |
+| `dbtk log read` | Read debug.log with filters (--level, --plugin, --since, --search) |
 | `dbtk query-log on/off/clear/stats` | Control database query logging |
+| `dbtk query-log start/stop/status` | Control recording sessions (--duration, --tag) |
+| `dbtk query-log read` | Read query logs with filters (--tag, --component, --slow, --duplicates) |
 | `dbtk viewer setup/remove/status` | Manage standalone log viewer |
 | `dbtk license activate/deactivate/status` | License management |
 
