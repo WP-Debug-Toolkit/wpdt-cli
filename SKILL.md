@@ -118,6 +118,8 @@ $WP dbtk query-log stop
 # Analyze what happened
 $WP dbtk query-log read --tag=my-test --slow --duplicates
 $WP dbtk query-log read --tag=my-test --component=woocommerce --format=json
+$WP dbtk query-log read --tag=my-test --summary           # Per-page overview
+$WP dbtk query-log read --tag=my-test --memory             # Memory usage per page
 $WP dbtk log read --level=error,warning --plugin=woocommerce --since=5m
 ```
 
@@ -175,7 +177,7 @@ Annotations persist across discovery runs.
 | `dbtk log read` | Read debug.log with filters (--level, --plugin, --since, --search) |
 | `dbtk query-log on/off/clear/stats` | Control database query logging |
 | `dbtk query-log start/stop/status` | Control recording sessions (--tag, optional --duration) |
-| `dbtk query-log read` | Read query logs with filters (--tag, --component, --slow, --duplicates) |
+| `dbtk query-log read` | Read query logs with filters (--tag, --component, --slow, --duplicates, --summary, --memory) |
 | `dbtk viewer setup/remove/status` | Manage standalone log viewer |
 | `dbtk license activate/deactivate/status` | License management |
 

@@ -457,7 +457,7 @@ Reads and filters captured query log entries. Queries are extracted from page-le
 **Syntax**
 
 ```
-wp dbtk query-log read [--tag=<label>] [--component=<name>] [--type=<type>] [--slow] [--duplicates] [--errors] [--since=<timerange>] [--search=<terms>] [--limit=<n>] [--format=<format>]
+wp dbtk query-log read [--tag=<label>] [--component=<name>] [--type=<type>] [--slow] [--duplicates] [--errors] [--summary] [--memory] [--since=<timerange>] [--search=<terms>] [--limit=<n>] [--format=<format>]
 ```
 
 **Options**
@@ -470,6 +470,8 @@ wp dbtk query-log read [--tag=<label>] [--component=<name>] [--type=<type>] [--s
 | `--slow` | flag | — | Only queries exceeding slow threshold |
 | `--duplicates` | flag | — | Only N+1 / duplicate patterns |
 | `--errors` | flag | — | Only queries with errors |
+| `--summary` | flag | — | Show per-page summary (URL, queries, slow, dupes, timing, memory, score) instead of individual queries |
+| `--memory` | flag | — | Show only memory usage per page load (URL, peak MB, current MB, limit MB, % used, high flag) |
 | `--since` | string | — | Time range: 1m, 5m, 15m, 30m, 1h, 6h, 24h, 7d |
 | `--search` | string | — | Search SQL text. `+include -exclude` syntax |
 | `--limit` | int | 100 | Max entries to return |
@@ -489,6 +491,41 @@ wp dbtk query-log read --tag=my-test --duplicates --format=json
 
 # Search for queries touching a specific table
 wp dbtk query-log read --search="+wp_postmeta -autoload" --type=SELECT
+
+# Per-page summary of a recording session
+wp dbtk query-log read --tag=woo-checkout-test --summary
+
+# Memory usage per page load
+wp dbtk query-log read --tag=woo-checkout-test --memory
+
+# Summary as JSON (works with --format)
+wp dbtk query-log read --tag=woo-checkout-test --summary --format=json
+```
+
+**Example output (--summary)**
+
+```
++----------------------------------+---------+------+-------+-----------+--------+-------+
+| url                              | queries | slow | dupes | timing_ms | mem_mb | score |
++----------------------------------+---------+------+-------+-----------+--------+-------+
+| /shop/                           | 84      | 2    | 5     | 320.4     | 18.2   | C     |
+| /cart/                           | 42      | 0    | 1     | 105.7     | 12.4   | A     |
+| /checkout/                       | 67      | 1    | 3     | 245.1     | 16.8   | B     |
++----------------------------------+---------+------+-------+-----------+--------+-------+
+Summary: 3 pages, 193 queries, 3 slow, 9 duplicates
+```
+
+**Example output (--memory)**
+
+```
++----------------------------------+---------+------------+----------+--------+------+
+| url                              | peak_mb | current_mb | limit_mb | used_% | high |
++----------------------------------+---------+------------+----------+--------+------+
+| /shop/                           | 18.2    | 14.6       | 256      | 7.1%   | No   |
+| /cart/                           | 12.4    | 10.1       | 256      | 4.8%   | No   |
+| /checkout/                       | 16.8    | 13.9       | 256      | 6.6%   | No   |
++----------------------------------+---------+------------+----------+--------+------+
+Summary: 3 pages, peak 18.2 MB
 ```
 
 **Example output (table)**
