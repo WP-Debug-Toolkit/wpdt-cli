@@ -77,6 +77,56 @@ Output (abridged):
 
 ---
 
+## Advanced Workflows
+
+### Record queries while browsing
+
+Start a tagged recording, browse the site manually, stop when done, then analyze the captured queries with filters:
+
+```bash
+wp dbtk query-log start --tag=checkout-flow
+# Browse the site, test checkout, etc.
+wp dbtk query-log stop
+wp dbtk query-log read --tag=checkout-flow --slow --duplicates
+wp dbtk query-log read --tag=checkout-flow --component=woocommerce --format=json
+```
+
+### Compare before and after a code change
+
+Profile an endpoint, make your change, profile again, and compare the results:
+
+```bash
+# Before
+wp dbtk api call GET /wc/v3/products --params='{"per_page":10}' --profile > /tmp/before.json
+
+# Make your code change...
+
+# After
+wp dbtk api call GET /wc/v3/products --params='{"per_page":10}' --profile > /tmp/after.json
+
+# Compare query counts, timing, and duplicates between the two files
+```
+
+### Investigate a slow page
+
+Profile the endpoint behind a slow page, find the slowest queries, and check for N+1 patterns:
+
+```bash
+# Profile the endpoint
+wp dbtk api call GET /wp/v2/posts --params='{"per_page":20}' --profile
+
+# Check the profile output for:
+#   - queries.slow — queries exceeding the slow threshold
+#   - queries.duplicates — repeated queries (N+1 problems)
+#   - queries.by_component — which plugin is responsible
+#   - queries.slowest — the top offenders with full SQL
+
+# If you see duplicates, drill into the query log for details
+wp dbtk query-log read --slow --duplicates --format=json
+```
+
+---
+
 ## Supported Environments
 
 | Environment | Status |

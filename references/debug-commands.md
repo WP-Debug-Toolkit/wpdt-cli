@@ -365,20 +365,31 @@ wp dbtk query-log start [--duration=<seconds>] [--tag=<label>]
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `--duration` | int | 60 | Recording duration in seconds (1-3600) |
+| `--duration` | int | 0 | Recording duration in seconds (1-3600). Default `0` means record until explicitly stopped (max 1 hour). |
 | `--tag` | string | auto `rec-YYYY-MM-DD-HHmmss` | Custom label for this recording session |
 
 **Examples**
 
 ```bash
-# Start a 60-second recording with auto-generated tag
+# Start recording until explicitly stopped (max 1 hour)
 wp dbtk query-log start
+
+# Start recording with a custom tag (records until stopped)
+wp dbtk query-log start --tag=woo-checkout-test
 
 # Start a 2-minute recording with a custom tag
 wp dbtk query-log start --duration=120 --tag=woo-checkout-test
 ```
 
 **Example output**
+
+Without `--duration`:
+
+```
+Success: Recording started. Tag: woo-checkout-test | Duration: Until stopped (max 1h)
+```
+
+With `--duration`:
 
 ```
 Success: Recording started. Tag: woo-checkout-test | Duration: 120s | Expires: 2026-04-03 15:35:00

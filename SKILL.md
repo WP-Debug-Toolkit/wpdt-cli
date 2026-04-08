@@ -105,8 +105,8 @@ $WP dbtk api call GET /wp/v2/posts --profile=summary   # Just timing + counts
 Capture everything that happens during a sequence of actions:
 
 ```bash
-# Start recording with a label
-$WP dbtk query-log start --duration=120 --tag=my-test
+# Start recording with a label (--duration is optional; omit it to record until you stop)
+$WP dbtk query-log start --tag=my-test
 
 # Do stuff — run CLI commands, browse the site, whatever
 $WP post list
@@ -174,7 +174,7 @@ Annotations persist across discovery runs.
 | `dbtk log clear/stats` | Manage debug.log file |
 | `dbtk log read` | Read debug.log with filters (--level, --plugin, --since, --search) |
 | `dbtk query-log on/off/clear/stats` | Control database query logging |
-| `dbtk query-log start/stop/status` | Control recording sessions (--duration, --tag) |
+| `dbtk query-log start/stop/status` | Control recording sessions (--tag, optional --duration) |
 | `dbtk query-log read` | Read query logs with filters (--tag, --component, --slow, --duplicates) |
 | `dbtk viewer setup/remove/status` | Manage standalone log viewer |
 | `dbtk license activate/deactivate/status` | License management |
