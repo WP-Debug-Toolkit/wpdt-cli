@@ -386,7 +386,7 @@ wp dbtk query-log start --duration=120 --tag=woo-checkout-test
 Without `--duration`:
 
 ```
-Success: Recording started. Tag: woo-checkout-test | Duration: Until stopped (max 1h)
+Success: Recording started. Tag: woo-checkout-test | Until stopped (max 1h) | Expires: 2026-04-03 16:35:00
 ```
 
 With `--duration`:
@@ -505,27 +505,21 @@ wp dbtk query-log read --tag=woo-checkout-test --summary --format=json
 **Example output (--summary)**
 
 ```
-+----------------------------------+---------+------+-------+-----------+--------+-------+
-| url                              | queries | slow | dupes | timing_ms | mem_mb | score |
-+----------------------------------+---------+------+-------+-----------+--------+-------+
-| /shop/                           | 84      | 2    | 5     | 320.4     | 18.2   | C     |
-| /cart/                           | 42      | 0    | 1     | 105.7     | 12.4   | A     |
-| /checkout/                       | 67      | 1    | 3     | 245.1     | 16.8   | B     |
-+----------------------------------+---------+------+-------+-----------+--------+-------+
-Summary: 3 pages, 193 queries, 3 slow, 9 duplicates
+url          queries  slow  dupes  time_ms  memory_mb  mem_%  score
+/shop/       84       2     5      320.4    18         7      46
+/cart/       42       0     1      105.7    12         5      91
+/checkout/   67       1     3      245.1    16         7      61
+Summary: 3 page loads, 193 total queries, 3 slow, 15.3 MB avg peak memory
 ```
 
 **Example output (--memory)**
 
 ```
-+----------------------------------+---------+------------+----------+--------+------+
-| url                              | peak_mb | current_mb | limit_mb | used_% | high |
-+----------------------------------+---------+------------+----------+--------+------+
-| /shop/                           | 18.2    | 14.6       | 256      | 7.1%   | No   |
-| /cart/                           | 12.4    | 10.1       | 256      | 4.8%   | No   |
-| /checkout/                       | 16.8    | 13.9       | 256      | 6.6%   | No   |
-+----------------------------------+---------+------------+----------+--------+------+
-Summary: 3 pages, peak 18.2 MB
+url          peak_mb  current_mb  limit_mb  used_%  high
+/shop/       18       14          256       7
+/cart/       12       10          256       5
+/checkout/   16       13          256       7
+Summary: 3 page loads, 15.3 MB avg peak, 18.0 MB max peak, 0 high-memory requests
 ```
 
 **Example output (table)**
