@@ -107,6 +107,30 @@ wp dbtk api call GET /wc/v3/products --params='{"per_page":10}' --profile > /tmp
 # Compare query counts, timing, and duplicates between the two files
 ```
 
+### Track performance while vibecoding
+
+When you're building features or fixing bugs with an AI assistant, use tagged recordings to catch regressions as you go:
+
+```bash
+# Record a baseline before your change
+wp dbtk query-log start --tag=before-fix
+# Browse the site, test the flow
+wp dbtk query-log stop
+wp dbtk query-log read --tag=before-fix --summary
+
+# Make your code change, then record again
+wp dbtk query-log start --tag=after-fix
+# Test the same flow
+wp dbtk query-log stop
+wp dbtk query-log read --tag=after-fix --summary
+
+# Compare memory usage between the two
+wp dbtk query-log read --tag=before-fix --memory
+wp dbtk query-log read --tag=after-fix --memory
+```
+
+Record before, record after, compare. A simple habit that keeps performance smooth while developing.
+
 ### Investigate a slow page
 
 Profile the endpoint behind a slow page, find the slowest queries, and check for N+1 patterns:

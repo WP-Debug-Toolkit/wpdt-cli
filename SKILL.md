@@ -123,6 +123,30 @@ $WP dbtk query-log read --tag=my-test --memory             # Memory usage per pa
 $WP dbtk log read --level=error,warning --plugin=woocommerce --since=5m
 ```
 
+### Compare before and after while vibecoding
+
+When building features or fixing bugs, use tagged recordings to catch performance regressions as you go:
+
+```bash
+# Record a baseline
+$WP dbtk query-log start --tag=before-fix
+# User browses the site / tests the flow
+$WP dbtk query-log stop
+$WP dbtk query-log read --tag=before-fix --summary
+
+# Make the code change, then record again
+$WP dbtk query-log start --tag=after-fix
+# User tests the same flow
+$WP dbtk query-log stop
+$WP dbtk query-log read --tag=after-fix --summary
+
+# Compare: did query count drop? Any new slow queries? Memory change?
+$WP dbtk query-log read --tag=before-fix --memory
+$WP dbtk query-log read --tag=after-fix --memory
+```
+
+This is a good habit to build into any vibecoding workflow — record before, record after, compare.
+
 ### Read query logs with filters
 
 ```bash
