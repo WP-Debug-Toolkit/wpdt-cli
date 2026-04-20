@@ -28,6 +28,8 @@ Supported agents: **Claude Code**, **Cursor**, **VS Code Copilot**, **Codex**, *
 
 - Profile any REST endpoint — timing, query counts, memory delta, slow queries, N+1 detection, and per-plugin query attribution
 - Discover all REST APIs registered by plugins, themes, and WordPress core
+- Persistent endpoint annotations — your agent's notes about cryptic third-party endpoints (safety, auth, return shape) survive across sessions and can be exported as a pack to share with a team or load on another site
+- Bootstrap a fresh agent session with a Markdown brief of any plugin's API
 - Enable or disable debug mode and query logging from the terminal
 - Call any endpoint with automatic authentication (no manual token setup)
 - Search and inspect endpoint details
@@ -130,6 +132,48 @@ wp dbtk query-log read --tag=after-fix --memory
 ```
 
 Record before, record after, compare. A simple habit that keeps performance smooth while developing.
+
+### Bootstrap an agent session with a plugin's API
+
+Before doing API work against a specific plugin, hand your agent a brief instead of asking it to rediscover routes from training data:
+
+```bash
+wp dbtk api discover                          # Run once per site
+wp dbtk api bootstrap --source=woocommerce    # Markdown brief: namespace, routes, safety, annotations
+wp dbtk api bootstrap --source=rankmath --annotated-only --max-routes=20
+```
+
+Pipe it into a file your agent reads at startup, or paste it into the chat. The brief is faster and more accurate than rediscovery, and it picks up any annotations you (or previous sessions) have saved.
+
+### Annotate cryptic endpoints so the next session knows them
+
+When you (or your agent) figures out what an unfamiliar endpoint does, save it. Annotations persist across `discover` runs and surface in `list`, `show`, `search`, and `bootstrap`:
+
+```bash
+# Method-level annotation with safety classification
+wp dbtk api edit /wc/v3/orders --method=POST \
+  --description="Create a new order" \
+  --safety=mutates-data \
+  --auth-note="Requires shop_manager or administrator" \
+  --returns="Created order object with id and status"
+```
+
+Valid `--safety` values: `read-only`, `mutates-data`, `destructive`, `unknown`. Agents that read annotated schemas treat `mutates-data` and `destructive` as a strong hint to require explicit user confirmation before calling.
+
+### Share annotations across sites
+
+Annotations are stored as a portable JSON pack:
+
+```bash
+# On the source site
+wp dbtk api export --source=woocommerce --annotated-only > woocommerce-annotations.json
+
+# On another site
+wp dbtk api import woocommerce-annotations.json --dry-run    # Preview
+wp dbtk api import woocommerce-annotations.json              # Merge
+```
+
+Use `--mode=replace-source` to wipe and replace all annotations for a source. Use `--template` on export to generate empty fields for batch annotation by a human or AI.
 
 ### Investigate a slow page
 
