@@ -72,9 +72,25 @@ The `profile.queries.by_component` object shows exactly how many queries each pl
 $WP dbtk api discover      # Scan all plugins/themes/core for REST routes
 $WP dbtk api list           # Show all discovered routes
 $WP dbtk api list --source=woocommerce  # Filter by plugin
+$WP dbtk api list --annotated-only       # Only routes with saved annotations
+$WP dbtk api list --tag=mutates-data     # Filter by annotation tag
 $WP dbtk api search "order" # Find endpoints by keyword
+$WP dbtk api search "order" --source=woocommerce --annotated-only
 $WP dbtk api show /wc/v3/products  # Full detail for a specific route
+$WP dbtk api show /wc/v3/products --method=POST  # Method-specific detail
 ```
+
+### Load a plugin's API into your session before doing API work
+
+When you're about to work against a specific plugin's REST API, run `bootstrap` first. It produces a Markdown brief — namespace, route counts, safety distribution, per-route summaries with method annotations — that's faster and more accurate than rediscovering everything mid-conversation:
+
+```bash
+$WP dbtk api bootstrap --source=woocommerce            # Markdown brief, paste into context
+$WP dbtk api bootstrap --source=rankmath --annotated-only --max-routes=20
+$WP dbtk api bootstrap --source=woocommerce --format=json   # For programmatic use
+```
+
+If `bootstrap` returns "Source not found," run `$WP dbtk api discover` first.
 
 ### Enable/disable debug mode
 
@@ -176,26 +192,66 @@ $WP dbtk query-log clear   # Clear the log
 $WP dbtk query-log off     # Disable query logging
 ```
 
-### Annotate third-party endpoints
+### Annotate endpoints with semantic metadata
 
-When you figure out what a cryptic endpoint does, save it:
+Every time you figure out what a cryptic endpoint does — its safety, its required role, what it returns — save it. Annotations persist across `discover` runs and become part of every future `list`, `show`, `search`, and `bootstrap` for that route.
+
+Use method-level annotations whenever possible (a `GET` is often safe while the matching `POST` is destructive). Always include `--safety` so future agent sessions know whether the endpoint is safe to call without user confirmation.
 
 ```bash
-$WP dbtk api edit /elementor/v1/globals --description="Fetch global design settings (colors, fonts)"
+# Route-level summary (applies to all methods)
+$WP dbtk api edit /elementor/v1/globals \
+  --description="Fetch global design settings (colors, fonts)" \
+  --safety=read-only
+
+# Method-level annotation with full detail
+$WP dbtk api edit /wc/v3/orders --method=POST \
+  --description="Create a new order" \
+  --safety=mutates-data \
+  --auth-note="Requires shop_manager or administrator" \
+  --returns="Created order object with id and status" \
+  --verification=verified-runtime
+
+# Tag for grouping; verification marks how confident you are
+$WP dbtk api edit /wc/v3/orders --tag=orders,wc --verification=verified-runtime
 ```
 
-Annotations persist across discovery runs.
+Valid `--safety` values: `read-only`, `mutates-data`, `destructive`, `unknown`.
+Valid `--verification` values: `inferred`, `verified-source`, `verified-runtime`, `verified-docs`.
+
+### Share annotations across sites
+
+Annotations are stored as a portable JSON pack. Export from one site, import on another to seed the knowledge base instantly:
+
+```bash
+# Export annotated routes for a plugin
+$WP dbtk api export --source=woocommerce --annotated-only > woocommerce-annotations.json
+
+# On another site, preview then import
+$WP dbtk api import woocommerce-annotations.json --dry-run
+$WP dbtk api import woocommerce-annotations.json                  # Merge with existing
+$WP dbtk api import woocommerce-annotations.json --mode=replace-source  # Replace all for source
+```
+
+Use `--template` on export to generate empty fields for batch annotation:
+
+```bash
+$WP dbtk api export --source=rankmath --template > rankmath-template.json
+```
 
 ## Quick Command Reference
 
 | Command | Purpose |
 |---------|---------|
-| `dbtk api list` | List routes (--namespace, --method, --source, --format) |
+| `dbtk api list` | List routes (--namespace, --method, --source, --annotated-only, --tag, --format) |
 | `dbtk api discover` | Scan all registered REST routes |
 | `dbtk api call <METHOD> <route>` | Call any endpoint (--params, --profile, --format) |
-| `dbtk api show <route>` | Show full detail for a route |
-| `dbtk api search <keyword>` | Search routes by keyword |
-| `dbtk api edit <route>` | Annotate an endpoint (--description) |
+| `dbtk api show <route>` | Show full detail for a route (--method, --format) |
+| `dbtk api search <keyword>` | Search routes by keyword (--source, --annotated-only, --format) |
+| `dbtk api edit <route>` | Annotate an endpoint (--method, --description, --safety, --auth-note, --returns, --tag, --verification) |
+| `dbtk api export` | Export annotations as a portable pack (--source, --annotated-only, --template) |
+| `dbtk api import <file>` | Import an annotation pack (--mode=merge\|replace-source, --dry-run) |
+| `dbtk api bootstrap` | Generate a Markdown brief for an agent session (--source, --annotated-only, --max-routes) |
 | `dbtk debug on/off/status` | Control WP_DEBUG, WP_DEBUG_LOG, WP_DEBUG_DISPLAY |
 | `dbtk log clear/stats` | Manage debug.log file |
 | `dbtk log read` | Read debug.log with filters (--level, --plugin, --since, --search) |

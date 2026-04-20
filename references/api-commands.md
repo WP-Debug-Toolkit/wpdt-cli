@@ -31,7 +31,7 @@ Lists REST routes from the schema store. Shows WPDT endpoints by default until `
 **Syntax**
 
 ```
-wp dbtk api list [--namespace=<ns>] [--method=<method>] [--source=<slug>] [--format=<format>]
+wp dbtk api list [--namespace=<ns>] [--method=<method>] [--source=<slug>] [--annotated-only] [--tag=<tag>] [--format=<format>]
 ```
 
 **Options**
@@ -41,6 +41,8 @@ wp dbtk api list [--namespace=<ns>] [--method=<method>] [--source=<slug>] [--for
 | `--namespace` | string | — | Filter by REST namespace (e.g., `wc/v3`, `wp/v2`) |
 | `--method` | string | — | Filter by HTTP method: `GET`, `POST`, `PUT`, `DELETE` |
 | `--source` | string | — | Filter by source plugin slug (e.g., `woocommerce`, `wpdebugtoolkit`) |
+| `--annotated-only` | flag | — | Only show routes that have saved annotations |
+| `--tag` | string | — | Filter by route-level or method-level annotation tag |
 | `--format` | string | `table` | Output format: `table` or `json` |
 
 **Example command**
@@ -78,7 +80,7 @@ Shows full detail for a single route: methods, parameters, auth requirements, an
 **Syntax**
 
 ```
-wp dbtk api show <route> [--format=<format>]
+wp dbtk api show <route> [--method=<method>] [--format=<format>]
 ```
 
 **Arguments**
@@ -91,6 +93,7 @@ wp dbtk api show <route> [--format=<format>]
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
+| `--method` | string | — | Show details for a specific HTTP method only (e.g., `POST`) |
 | `--format` | string | `table` | Output format: `table` or `json` |
 
 **Example command**
@@ -128,7 +131,7 @@ Searches all routes in the schema store by keyword, matching against route paths
 **Syntax**
 
 ```
-wp dbtk api search <keyword> [--format=<format>]
+wp dbtk api search <keyword> [--source=<slug>] [--annotated-only] [--format=<format>]
 ```
 
 **Arguments**
@@ -141,6 +144,8 @@ wp dbtk api search <keyword> [--format=<format>]
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
+| `--source` | string | — | Filter results by source plugin slug |
+| `--annotated-only` | flag | — | Only show results with annotations |
 | `--format` | string | `table` | Output format: `table` or `json` |
 
 **Example command**
@@ -287,18 +292,18 @@ wp dbtk api call GET /wp/v2/posts --profile=summary
 }
 ```
 
-> **Note on query capture:** Query analysis (total, slow, duplicates, by_component) requires SAVEQUERIES to be enabled. There is a known issue where SAVEQUERIES may already be defined as `false` during WP-CLI bootstrap, preventing query capture for that request. When query capture works, the full query breakdown is returned. If queries are not captured, query fields will be absent or zero.
-
 ---
 
 ## `wp dbtk api edit <route>`
 
-Annotates an endpoint with a custom description. Annotations persist across `discover` runs and appear in `list` and `show` output.
+Annotates an endpoint with semantic metadata. Annotations are stored separately from the discovered schema, so they persist across `discover` runs and appear in `list`, `show`, `search`, and `bootstrap` output.
+
+Annotations can be route-level (apply to all methods) or method-level (specific to one HTTP method via `--method`). Provide at least one annotation field per call. Pass an empty string to clear a field.
 
 **Syntax**
 
 ```
-wp dbtk api edit <route> --description=<text>
+wp dbtk api edit <route> [--method=<method>] [--description=<text>] [--purpose=<text>] [--safety=<level>] [--auth-note=<text>] [--returns=<text>] [--example-params=<json>] [--tag=<tags>] [--verification=<state>]
 ```
 
 **Arguments**
@@ -309,20 +314,177 @@ wp dbtk api edit <route> --description=<text>
 
 **Options**
 
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| `--description` | string | Yes | Description text to save for this route |
+| Option | Type | Description |
+|--------|------|-------------|
+| `--method` | string | HTTP method for method-level annotation (e.g., `POST`). Omit for route-level. |
+| `--description` | string | Summary description of the endpoint |
+| `--purpose` | string | When and why to use this endpoint |
+| `--safety` | string | Safety level: `read-only`, `mutates-data`, `destructive`, `unknown` |
+| `--auth-note` | string | Authentication/authorization notes (e.g., required role) |
+| `--returns` | string | Summary of what the endpoint returns |
+| `--example-params` | JSON string | Example parameters as a JSON object |
+| `--tag` | string | Comma-separated tags |
+| `--verification` | string | Verification state: `inferred`, `verified-source`, `verified-runtime`, `verified-docs` |
 
-**Example command**
+**Example: Route-level summary**
 
 ```bash
-wp dbtk api edit /elementor/v1/globals --description="Fetch global design settings (colors, fonts)"
+wp dbtk api edit /elementor/v1/globals --description="Fetch global design settings (colors, fonts)" --safety=read-only
+```
+
+**Example: Method-level annotation**
+
+```bash
+wp dbtk api edit /wc/v3/orders --method=POST \
+  --description="Create a new order" \
+  --safety=mutates-data \
+  --auth-note="Requires shop_manager or administrator" \
+  --returns="Created order object with id and status"
+```
+
+**Example: Mark verification and tag**
+
+```bash
+wp dbtk api edit /wc/v3/orders --tag=orders,wc --verification=verified-runtime
+```
+
+**Example: Clear a field**
+
+```bash
+wp dbtk api edit /wc/v3/orders --description="" --safety=""
 ```
 
 **Example output**
 
 ```
-Success: Annotation saved for /elementor/v1/globals.
+Success: Annotation saved for /wc/v3/orders.
 ```
 
-Use this when you figure out what a cryptic third-party endpoint does. The note shows up in `list` and `show` output on future runs.
+Use the `--safety` field aggressively. Agents that read annotated schemas treat `mutates-data` and `destructive` as a strong hint to avoid calling the endpoint without explicit user confirmation.
+
+---
+
+## `wp dbtk api export`
+
+Exports annotations for a single source as a JSON pack. Packs are portable across sites and can be checked into version control or shared with a team. Combine with `import` on another site to replicate your annotation library.
+
+**Syntax**
+
+```
+wp dbtk api export [--source=<slug>] [--namespace=<ns>] [--template] [--annotated-only] [--format=json]
+```
+
+**Options**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `--source` | string | Source plugin slug to export (e.g., `woocommerce`). Required if `--namespace` is omitted. |
+| `--namespace` | string | REST namespace to identify the source (e.g., `wc/v3`). Required if `--source` is omitted. |
+| `--template` | flag | Export with empty semantic fields, ready to be filled in by a human or AI agent |
+| `--annotated-only` | flag | Only include routes that already have annotations |
+| `--format` | string | Output format. Currently only `json`. |
+
+**Example: Export annotated routes for a plugin**
+
+```bash
+wp dbtk api export --source=woocommerce --annotated-only > woocommerce-annotations.json
+```
+
+**Example: Generate a template for AI/human completion**
+
+```bash
+wp dbtk api export --source=rankmath --template > rankmath-template.json
+```
+
+The exported pack contains the source slug, schema version, and per-route annotations. Use `import` on another site to load it.
+
+---
+
+## `wp dbtk api import <file>`
+
+Loads an annotation pack into the local schema store. Supports merging into existing annotations or replacing all annotations for the pack's source.
+
+**Syntax**
+
+```
+wp dbtk api import <file> [--mode=<mode>] [--dry-run]
+```
+
+**Arguments**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `<file>` | Yes | Path to the JSON pack file produced by `wp dbtk api export` |
+
+**Options**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--mode` | string | `merge` | Import mode: `merge` (combine with existing annotations) or `replace-source` (replace all annotations for the source) |
+| `--dry-run` | flag | — | Validate and report what would change without writing |
+
+**Example: Preview an import**
+
+```bash
+wp dbtk api import woocommerce-annotations.json --dry-run
+```
+
+**Example: Merge into existing annotations**
+
+```bash
+wp dbtk api import woocommerce-annotations.json
+```
+
+**Example: Replace everything for the source**
+
+```bash
+wp dbtk api import woocommerce-annotations.json --mode=replace-source
+```
+
+**Example output**
+
+```
+Success: Imported 27 routes via merge mode.
+```
+
+---
+
+## `wp dbtk api bootstrap`
+
+Generates a compact API brief for a single plugin source, optimized for loading into a fresh AI agent session before any other API work. The Markdown format is designed to be pasted into a chat, attached to a system prompt, or piped into a file the agent reads at startup.
+
+**Syntax**
+
+```
+wp dbtk api bootstrap [--source=<slug>] [--namespace=<ns>] [--annotated-only] [--max-routes=<n>] [--format=<format>]
+```
+
+**Options**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--source` | string | — | Source plugin slug. Required if `--namespace` is omitted. |
+| `--namespace` | string | — | REST namespace to identify the source. Required if `--source` is omitted. |
+| `--annotated-only` | flag | — | Only include routes that have annotations |
+| `--max-routes` | integer | — | Maximum number of routes to include in the brief |
+| `--format` | string | `markdown` | Output format: `markdown` or `json` |
+
+**Example: Brief a plugin's full API**
+
+```bash
+wp dbtk api bootstrap --source=woocommerce
+```
+
+**Example: Brief only what's been annotated, capped at 20 routes**
+
+```bash
+wp dbtk api bootstrap --source=rankmath --annotated-only --max-routes=20
+```
+
+**Example: JSON for programmatic consumption**
+
+```bash
+wp dbtk api bootstrap --source=woocommerce --format=json
+```
+
+The brief includes the namespace, route counts, safety level distribution, and per-route summaries with method-level annotations. Run this at the start of any agent session that will work against a specific plugin's API — it's faster and more accurate than asking the agent to rediscover routes from scratch.
